@@ -49,7 +49,6 @@ Thumbs.db
 *.sqlite
 
 legal-risk/
-models/
 .README.md
 tst_script.py
 .venv/
