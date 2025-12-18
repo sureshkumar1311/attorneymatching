@@ -57,7 +57,7 @@ class AttorneyStored(BaseModel):
 # ---- Public Data Models ----
 class PublicSourceCreate(BaseModel):
     title: str = Field(..., max_length=500)
-    url: str = Field(..., regex=r'^https?://.+')
+    url: str = Field(..., pattern=r'^https?://.+')
 
 class ReferenceData(BaseModel):
     source: Optional[str] = None
