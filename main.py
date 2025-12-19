@@ -163,7 +163,7 @@ async def create_attorney(attorney: AttorneyCreate):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@app.post("/api/v1/attorneys/bulk/excel")
+'''@app.post("/api/v1/attorneys/bulk/excel")
 async def upload_attorneys_excel(file: UploadFile = File(...)):
     """Bulk upload attorneys from Excel file"""
     
@@ -198,7 +198,7 @@ async def upload_attorneys_excel(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
     finally:
         # Clean up temp file
-        file_path.unlink(missing_ok=True)
+        file_path.unlink(missing_ok=True)'''
 
 
 @app.get("/api/v1/attorneys")
@@ -219,13 +219,13 @@ async def get_attorneys(
         raise HTTPException(status_code=500, detail=f"Error fetching attorneys: {str(e)}")
 
 
-@app.get("/api/v1/attorneys/{attorney_id}")
+'''@app.get("/api/v1/attorneys/{attorney_id}")
 async def get_attorney(attorney_id: str):
     """Get a specific attorney by ID"""
     attorney = attorney_service.get_attorney_by_id(attorney_id)
     if not attorney:
         raise HTTPException(status_code=404, detail="Attorney not found")
-    return attorney
+    return attorney'''
 
 
 @app.delete("/api/v1/attorneys/{attorney_id}")
@@ -263,7 +263,7 @@ async def create_public_source(
         raise HTTPException(status_code=500, detail=f"Error creating public source: {str(e)}")
 
 
-@app.post("/api/v1/public-sources/bulk/excel")
+'''@app.post("/api/v1/public-sources/bulk/excel")
 async def upload_public_sources_excel(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = None
@@ -299,7 +299,7 @@ async def upload_public_sources_excel(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
     finally:
-        file_path.unlink(missing_ok=True)
+        file_path.unlink(missing_ok=True)'''
 
 
 @app.get("/api/v1/public-sources")
@@ -320,16 +320,16 @@ async def get_public_sources(
         raise HTTPException(status_code=500, detail=f"Error fetching public sources: {str(e)}")
 
 
-@app.get("/api/v1/public-sources/{news_id}")
+'''@app.get("/api/v1/public-sources/{news_id}")
 async def get_public_source(news_id: str):
     """Get a specific public source by ID"""
     source = public_source_service.get_public_source_by_id(news_id)
     if not source:
         raise HTTPException(status_code=404, detail="Public source not found")
-    return source
+    return source'''
 
 
-@app.patch("/api/v1/public-sources/{news_id}/enrich")
+'''@app.patch("/api/v1/public-sources/{news_id}/enrich")
 async def trigger_enrichment(news_id: str, background_tasks: BackgroundTasks):
     """Manually trigger enrichment for a public source"""
     
@@ -348,7 +348,7 @@ async def trigger_enrichment(news_id: str, background_tasks: BackgroundTasks):
     # Schedule enrichment
     background_tasks.add_task(enrichment_service.enrich_public_source, news_id)
     
-    return {"message": "Enrichment queued", "news_id": news_id}
+    return {"message": "Enrichment queued", "news_id": news_id}'''
 
 
 @app.delete("/api/v1/public-sources/{news_id}")
@@ -377,7 +377,7 @@ async def health_check():
     }
 
 
-@app.get("/")
+'''@app.get("/")
 async def root():
     """Root endpoint"""
     return {
@@ -385,7 +385,7 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/health"
-    }
+    }'''
 
 
 # ============================================

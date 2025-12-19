@@ -93,7 +93,7 @@ class RiskAnalysisService:
         logger.info(f"Identified {len(risks)} risks")
         logger.info(f"Found {len(references)} references")
         logger.info(f"Recommended: {attorney.name}")
-        logger.info(f"Confidence: {confidence:.2%}")
+        logger.info(f"Confidence: {confidence}%")
         
         return response
     
@@ -236,7 +236,7 @@ Return your analysis as a JSON object with this structure:
         "Specific risk 2 with clear description",
         "Specific risk 3 with clear description"
     ],
-    "confidence_score": 0.85,
+    "confidence_score": 85,
     "reasoning": "Brief explanation of your analysis approach and data sources used"
 }}
 
@@ -306,7 +306,7 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
             result = json.loads(llm_response)
             
             risks = result.get("risks", [])
-            confidence = result.get("confidence_score", 0.85)
+            confidence = result.get("confidence_score",85)
             reasoning = result.get("reasoning", "")
             
             logger.info("\nLLM ANALYSIS PARSED:")
@@ -337,7 +337,7 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
                 "General compliance risk in the specified practice area requires assessment",
                 "Regulatory changes may impact operations and require monitoring",
                 "Documentation and reporting requirements need review"
-            ], [], 0.5
+            ], [], 50
     
     def _find_matching_attorney(
         self, 

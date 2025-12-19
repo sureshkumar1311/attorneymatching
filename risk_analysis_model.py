@@ -25,4 +25,4 @@ class RiskAnalysisResponse(BaseModel):
     references: List[ReferenceItem]
     recommended_attorney: RecommendedAttorney
     email_template: str
-    confidence_score: float = Field(..., ge=0.0, le=1.0)
+    confidence_score: float = Field(..., ge=1.0, le=100.0)
