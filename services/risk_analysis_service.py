@@ -67,12 +67,12 @@ class RiskAnalysisService:
         risks, references, confidence = self._get_llm_risk_analysis(prompt, public_sources)
         
         # Step 5: Find best matching attorney
-        attorney = self._find_matching_attorney(request.practicearea, rag_context)
+        attorneys = self._find_matching_attorneys(request.practicearea, rag_context)
         
         # Step 6: Generate email template
         email_template = self._generate_email_template(
             request, 
-            attorney, 
+            attorneys[0], 
             risks
         )
         
@@ -82,17 +82,18 @@ class RiskAnalysisService:
             practice_area=request.practicearea,
             risks=risks,
             references=references,
-            recommended_attorney=attorney,
+            recommended_attorneys=attorneys,  # Changed to plural
             email_template=email_template,
             confidence_score=confidence
         )
-        
+
         logger.info("\n" + "="*80)
         logger.info("RISK ANALYSIS COMPLETE")
         logger.info("="*80)
         logger.info(f"Identified {len(risks)} risks")
         logger.info(f"Found {len(references)} references")
-        logger.info(f"Recommended: {attorney.name}")
+        logger.info(f"Recommended {len(attorneys)} attorneys")  # Changed logging
+        logger.info(f"Top attorney: {attorneys[0].name}")
         logger.info(f"Confidence: {confidence}%")
         
         return response
@@ -339,18 +340,25 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
                 "Documentation and reporting requirements need review"
             ], [], 50
     
-    def _find_matching_attorney(
+    def _find_matching_attorneys(
         self, 
         practice_area: str,
-        rag_context: Dict[str, Any]
-    ) -> RecommendedAttorney:
+        rag_context: Dict[str, Any],
+        top_n: int = 3
+    ) -> List[RecommendedAttorney]:
         """
-        Find the best matching attorney based on practice area and experience
+        Find the top N matching attorneys based on practice area and experience
+        
+        Args:
+            practice_area: Target practice area
+            rag_context: RAG context with historical data
+            top_n: Number of top attorneys to return (default: 3)
         """
         logger.info("\n" + "-"*80)
         logger.info("STEP 5: ATTORNEY MATCHING")
         logger.info("-"*80)
         logger.info(f"Target Practice Area: {practice_area}")
+        logger.info(f"Returning top {top_n} attorneys")
         
         # Get attorneys with matching practice area
         attorneys = self.attorney_service.get_attorneys(practice_area=practice_area)
@@ -361,20 +369,26 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
             logger.warning("No attorneys found for practice area, searching all attorneys...")
             attorneys = self.attorney_service.get_attorneys()
         
+        if not attorneys:
+            logger.warning("No attorneys found in database")
+            return [RecommendedAttorney(
+                name="General Counsel",
+                role="Partner",
+                reason="No attorneys available in the system"
+            )]
+        
         # Extract attorney IDs from historical engagements
         historical_attorney_ids = set()
         for doc in rag_context.get('historical', []):
             content = doc.get('content', '')
-            # Look for attorney IDs in format ATT-XXXXXXXX
             import re
             ids = re.findall(r'ATT-[A-Z0-9]{8}', content)
             historical_attorney_ids.update(ids)
         
         logger.info(f"\nHistorical Attorney IDs found: {historical_attorney_ids}")
         
-        # Score attorneys
-        best_attorney = None
-        best_score = 0
+        # Score all attorneys
+        attorney_scores = []
         
         for attorney in attorneys:
             score = 0
@@ -402,12 +416,17 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
             score += seniority_bonus.get(attorney['seniority'], 0)
             
             # Experience bonus
-            score += min(attorney['years_of_experience'], 20)  # Cap at 20
+            score += min(attorney['years_of_experience'], 20)
             
             # Historical engagement bonus
             if attorney['attorney_id'] in historical_attorney_ids:
                 score += 30
                 logger.info(f"  Historical match bonus for {attorney['name']}!")
+            
+            attorney_scores.append({
+                'attorney': attorney,
+                'score': score
+            })
             
             logger.info(f"\n  Attorney: {attorney['name']}")
             logger.info(f"    ID: {attorney['attorney_id']}")
@@ -415,39 +434,49 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
             logger.info(f"    Experience: {attorney['years_of_experience']} years")
             logger.info(f"    Practice Areas: {[pa['area'] for pa in attorney.get('practice_areas', [])]}")
             logger.info(f"    Score: {score}")
+        
+        # Sort by score (descending)
+        attorney_scores.sort(key=lambda x: x['score'], reverse=True)
+        
+        # Get top N attorneys
+        top_attorneys = attorney_scores[:top_n]
+        
+        # Build RecommendedAttorney objects
+        recommended_list = []
+        
+        for idx, item in enumerate(top_attorneys, 1):
+            attorney = item['attorney']
+            score = item['score']
             
-            if score > best_score:
-                best_score = score
-                best_attorney = attorney
+            practice_areas_str = ", ".join([pa['area'] for pa in attorney.get('practice_areas', [])])
+            if not practice_areas_str:
+                practice_areas_str = "General Practice"
+            
+            reason = f"Specializes in {practice_areas_str} with {attorney['years_of_experience']} years of experience. "
+            
+            if attorney['attorney_id'] in historical_attorney_ids:
+                reason += "Has handled similar matters based on historical engagements. "
+            
+            reason += f"Match score: {score}/100"
+            
+            recommended_list.append(RecommendedAttorney(
+                name=attorney['name'],
+                role=f"{attorney['seniority']}, {practice_areas_str}",
+                reason=reason,
+                attorney_id=attorney['attorney_id'],
+                email=attorney['email']
+            ))
+            
+            if idx == 1:
+                logger.info(f"\nTOP MATCH:")
+            else:
+                logger.info(f"\nRANK #{idx}:")
+            logger.info(f"  Name: {attorney['name']}")
+            logger.info(f"  Role: {attorney['seniority']}")
+            logger.info(f"  Score: {score}")
+            logger.info(f"  Reason: {reason}")
         
-        if not best_attorney:
-            logger.warning("No attorney found, using default")
-            return RecommendedAttorney(
-                name="General Counsel",
-                role="Partner",
-                reason="No specific match found for this practice area"
-            )
-        
-        # Build reason string
-        practice_areas_str = ", ".join([pa['area'] for pa in best_attorney.get('practice_areas', [])])
-        reason = f"Specializes in {practice_areas_str} with {best_attorney['years_of_experience']} years of experience. "
-        
-        if best_attorney['attorney_id'] in historical_attorney_ids:
-            reason += "Has handled similar matters based on historical engagements."
-        
-        logger.info(f"\nBEST MATCH:")
-        logger.info(f"  Name: {best_attorney['name']}")
-        logger.info(f"  Role: {best_attorney['seniority']}")
-        logger.info(f"  Score: {best_score}")
-        logger.info(f"  Reason: {reason}")
-        
-        return RecommendedAttorney(
-            name=best_attorney['name'],
-            role=f"{best_attorney['seniority']}, {practice_areas_str}",
-            reason=reason,
-            attorney_id=best_attorney['attorney_id'],
-            email=best_attorney['email']
-        )
+        return recommended_list
     
     def _generate_email_template(
         self,
@@ -464,26 +493,33 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
         
         risks_formatted = "\n".join([f"• {risk}" for risk in risks])
         
+        # Build contact info section with optional fields
+        contact_info_lines = [f"- Company: {request.companyName}"]
+        if request.companyemail:
+            contact_info_lines.append(f"- Email: {request.companyemail}")
+        if request.companyphonenumber:
+            contact_info_lines.append(f"- Phone: {request.companyphonenumber}")
+        
+        contact_info = "\n".join(contact_info_lines)
+        
         template = f"""Dear {attorney.name},
 
-I hope this email finds you well. I am reaching out regarding {request.companyName}, a client seeking legal counsel in the {request.practicearea} practice area.
+    I hope this email finds you well. I am reaching out regarding {request.companyName}, a client seeking legal counsel in the {request.practicearea} practice area.
 
-Based on our preliminary analysis, we have identified the following potential legal risk areas that require attention:
+    Based on our preliminary analysis, we have identified the following potential legal risk areas that require attention:
 
-{risks_formatted}
+    {risks_formatted}
 
-Given your expertise in {request.practicearea} and your track record handling similar matters, we believe you would be an excellent fit for this engagement.
+    Given your expertise in {request.practicearea} and your track record handling similar matters, we believe you would be an excellent fit for this engagement.
 
-Client Contact Information:
-- Company: {request.companyName}
-- Email: {request.companyemail}
-- Phone: {request.companyphonenumber}
+    Client Contact Information:
+    {contact_info}
 
-Would you be available for an initial consultation to discuss these matters in more detail? Please let me know your availability, and I will coordinate with the client.
+    Would you be available for an initial consultation to discuss these matters in more detail? Please let me know your availability, and I will coordinate with the client.
 
-Best regards,
-Legal Services Team
-"""
+    Best regards,
+    Legal Services Team
+    """
         
         logger.info("Email template generated")
         logger.info(f"  - Length: {len(template)} characters")
