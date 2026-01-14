@@ -12,6 +12,8 @@ from datetime import datetime
 import uuid 
 import logging
 
+logger = logging.getLogger(__name__)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -125,17 +127,77 @@ async def upload_attorney_history_file(file: UploadFile = File(...)):
 
 # -------------------- LIST ENDPOINTS WITH SAS --------------------
 @app.get("/list/internal", response_model=ListResponse)
+
 def list_internal_files():
-    blobs = internal_container.list_blobs(name_starts_with="internal/")
-    files = [
-        FileItem(
-            filename=blob.name.replace("internal/", "", 1),
-            url=generate_sas_url(internal_container, blob.name)
-        )
-        for blob in blobs
-        if not blob.name.endswith("/")  # optional: skip folder placeholders
-    ]
-    return ListResponse(container="internal-data", files=files)
+
+    """
+
+    List all files in the internal container root (excluding internal/ folder) with SAS URLs
+
+    """
+
+    try:
+
+        # List ALL blobs in the container (no prefix filter)
+
+        blobs = internal_container.list_blobs()
+
+        files = []
+
+        for blob in blobs:
+
+            # Skip folders
+
+            if blob.name.endswith("/"):
+
+                continue
+
+            # Skip files inside the "internal/" folder
+
+            if blob.name.startswith("internal/"):
+
+                continue
+
+            try:
+
+                # Use the blob name as-is (it's already at root level)
+
+                display_name = blob.name
+
+                # Generate SAS URL
+
+                sas_url = generate_sas_url(internal_container, blob.name)
+
+                files.append(
+
+                    FileItem(
+
+                        filename=display_name,
+
+                        url=sas_url
+
+                    )
+
+                )
+
+                logger.info(f"Added file: {display_name}")
+
+            except Exception as e:
+
+                logger.error(f"Error processing blob {blob.name}: {str(e)}")
+
+                continue
+
+        logger.info(f"Successfully listed {len(files)} files")
+
+        return ListResponse(container="internal-data", files=files)
+
+    except Exception as e:
+
+        logger.error(f"Error listing files: {str(e)}")
+
+        raise
+ 
 
 @app.get("/list/attorney-history", response_model=ListResponse)
 def list_attorney_history_files():

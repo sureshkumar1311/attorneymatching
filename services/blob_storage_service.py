@@ -48,6 +48,12 @@ for container in [internal_container, attorney_history_container]:
             print(f"Note: {str(e)}")
 
 
+from datetime import datetime, timedelta, timezone
+from azure.storage.blob import generate_blob_sas, BlobSasPermissions
+import logging
+ 
+logger = logging.getLogger(__name__)
+ 
 def generate_sas_url(container_client, blob_name, expiry_minutes=10):
     """
     Generate a SAS URL for a blob with read permissions that forces download.
