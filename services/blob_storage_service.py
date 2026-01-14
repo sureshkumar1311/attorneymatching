@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
 from config import settings
+from urllib.parse import quote
 
 # Get configuration from settings
 AZURE_STORAGE_CONNECTION_STRING = settings.AZURE_STORAGE_CONNECTION_STRING
@@ -49,28 +50,37 @@ for container in [internal_container, attorney_history_container]:
 
 def generate_sas_url(container_client, blob_name, expiry_minutes=10):
     """
-    Generate a SAS URL for a blob with read permissions.
-    
+    Generate a SAS URL for a blob with read permissions that forces download.
+   
     Args:
         container_client: Azure blob container client
         blob_name: Name of the blob
         expiry_minutes: How long the SAS URL should be valid (default: 10 minutes)
-    
+   
     Returns:
-        str: Complete URL with SAS token
+        str: Complete URL with SAS token that forces download
     """
     account_name = container_client.account_name
     container_name = container_client.container_name
     account_key = container_client.credential.account_key
-
+   
+    # Extract the actual filename from the blob path
+    filename = blob_name.split("/")[-1]
+ 
+    # Generate SAS token with content disposition to force download
     sas_token = generate_blob_sas(
         account_name=account_name,
         container_name=container_name,
         blob_name=blob_name,
         account_key=account_key,
         permission=BlobSasPermissions(read=True),
-        expiry=datetime.utcnow() + timedelta(minutes=expiry_minutes)
+        expiry=datetime.utcnow() + timedelta(minutes=expiry_minutes),
+        content_disposition=f'attachment; filename="{filename}"',  # Forces download
+        content_type='application/pdf'  # Explicitly set PDF content type
     )
-
-    url = f"https://{account_name}.blob.core.windows.net/{container_name}/{blob_name}?{sas_token}"
+ 
+    # Properly encode the blob name for URL
+    encoded_blob_name = quote(blob_name, safe='/')
+    url = f"https://{account_name}.blob.core.windows.net/{container_name}/{encoded_blob_name}?{sas_token}"
+   
     return url

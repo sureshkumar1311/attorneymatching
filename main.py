@@ -128,8 +128,12 @@ async def upload_attorney_history_file(file: UploadFile = File(...)):
 def list_internal_files():
     blobs = internal_container.list_blobs(name_starts_with="internal/")
     files = [
-        FileItem(filename=blob.name, url=generate_sas_url(internal_container, blob.name))
+        FileItem(
+            filename=blob.name.replace("internal/", "", 1),
+            url=generate_sas_url(internal_container, blob.name)
+        )
         for blob in blobs
+        if not blob.name.endswith("/")  # optional: skip folder placeholders
     ]
     return ListResponse(container="internal-data", files=files)
 
