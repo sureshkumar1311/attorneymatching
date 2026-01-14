@@ -15,6 +15,7 @@ class RecommendedAttorney(BaseModel):
     name: str
     role: str
     reason: str
+    match_score: int 
     attorney_id: Optional[str] = None
     email: Optional[str] = None
 

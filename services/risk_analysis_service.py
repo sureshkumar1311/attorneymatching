@@ -374,7 +374,8 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
             return [RecommendedAttorney(
                 name="General Counsel",
                 role="Partner",
-                reason="No attorneys available in the system"
+                reason="No attorneys available in the system",
+                match_score=0
             )]
         
         # Extract attorney IDs from historical engagements
@@ -443,7 +444,7 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
         
         # Build RecommendedAttorney objects
         recommended_list = []
-        
+
         for idx, item in enumerate(top_attorneys, 1):
             attorney = item['attorney']
             score = item['score']
@@ -455,14 +456,15 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
             reason = f"Specializes in {practice_areas_str} with {attorney['years_of_experience']} years of experience. "
             
             if attorney['attorney_id'] in historical_attorney_ids:
-                reason += "Has handled similar matters based on historical engagements. "
+                reason += "Has handled similar matters based on historical engagements."
             
-            reason += f"Match score: {score}/100"
+            # Remove "Match score: {score}/100" from reason
             
             recommended_list.append(RecommendedAttorney(
                 name=attorney['name'],
                 role=f"{attorney['seniority']}, {practice_areas_str}",
                 reason=reason,
+                match_score=score,  # NEW FIELD
                 attorney_id=attorney['attorney_id'],
                 email=attorney['email']
             ))
@@ -473,7 +475,7 @@ IMPORTANT: Return ONLY valid JSON, no additional text or markdown formatting."""
                 logger.info(f"\nRANK #{idx}:")
             logger.info(f"  Name: {attorney['name']}")
             logger.info(f"  Role: {attorney['seniority']}")
-            logger.info(f"  Score: {score}")
+            logger.info(f"  Match Score: {score}")  # Updated logging
             logger.info(f"  Reason: {reason}")
         
         return recommended_list
